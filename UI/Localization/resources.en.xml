@@ -2006,6 +2006,7 @@ E
 			<Value ID="SnesMouse">SNES Mouse</Value>
 			<Value ID="SuperScope">Super Scope</Value>
 			<Value ID="Multitap">Super Multitap</Value>
+			<Value ID="SnesNttDataKeypad">SNES NTT Data Keypad</Value>
 
 			<Value ID="NesController">NES Controller</Value>
 			<Value ID="FamicomController">Famicom Controller</Value>
@@ -2372,6 +2373,23 @@ E
 			<Value ID="Right">D-Pad - Right</Value>
 			<Value ID="R">Button - Right</Value>
 			<Value ID="L">Button - Left</Value>
+		</Enum>
+		<Enum ID="SnesNttDataKeypadButtons">
+			<Value ID="Num0">Number 0</Value>
+			<Value ID="Num1">Number 1</Value>
+			<Value ID="Num2">Number 2</Value>
+			<Value ID="Num3">Number 3</Value>
+			<Value ID="Num4">Number 4</Value>
+			<Value ID="Num5">Number 5</Value>
+			<Value ID="Num6">Number 6</Value>
+			<Value ID="Num7">Number 7</Value>
+			<Value ID="Num8">Number 8</Value>
+			<Value ID="Num9">Number 9</Value>
+			<Value ID="Star">Star (*)</Value>
+			<Value ID="Pound">Pound (#)</Value>
+			<Value ID="Period">Period (.)</Value>
+			<Value ID="C">C</Value>
+			<Value ID="EndComunication">End communication</Value>
 		</Enum>
 		<Enum ID="NesConsoleType">
 			<Value ID="Nes001">NES - Front loader (NES-001)</Value>
