@@ -364,7 +364,7 @@ void SnesConsole::Serialize(Serializer& s)
 	SV(_controlManager);
 }
 
-SaveStateCompatInfo SnesConsole::ValidateSaveStateCompatibility(ConsoleType stateConsoleType)
+optional<SaveStateCompatInfo> SnesConsole::ValidateSaveStateCompatibility(Serializer& s, ConsoleType stateConsoleType)
 {
 	if(stateConsoleType == ConsoleType::Gameboy) {
 		//Keep all clock counters as-is when loading a GB/GBC state
@@ -377,7 +377,7 @@ SaveStateCompatInfo SnesConsole::ValidateSaveStateCompatibility(ConsoleType stat
 			"memoryManager.apuCycleCount"
 		};
 
-		return { true, "cart.gameboy.", "", fieldsToRemove };
+		return SaveStateCompatInfo { true, "cart.gameboy.", "", fieldsToRemove };
 	}
 
 	return {};

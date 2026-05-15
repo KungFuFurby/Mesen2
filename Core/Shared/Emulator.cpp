@@ -443,6 +443,7 @@ bool Emulator::InternalLoadRom(VirtualFile romFile, VirtualFile patchFile, bool 
 		MessageManager::DisplayMessage("Error", "CouldNotLoadFile", romFile.GetFileName());
 		if(debugger) {
 			_debugger.reset(debugger);
+			_internalDebugger = _debugger.get();
 			debugger->ResetSuspendCounter();
 		}
 		_blockDebuggerRequestCount--;
@@ -937,18 +938,24 @@ DeserializeResult Emulator::Deserialize(istream& in, uint32_t fileFormatVersion,
 		return DeserializeResult::InvalidFile;
 	}
 
-	if(includeSettings) {
-		SV(_settings);
+	//ValidateSaveStateCompatibility is used to validate if save states can be loaded
+	//This can be rejected is usually if the console type is different (e.g NES vs SNES) but can sometimes
+	//be allowed (e.g loading a SNES+SGB save state on a GB)
+	//Sometimes the save state will be rejected even on the same system (for example loading a regular NES save state while in VS DualSystem mode).
+	//Note: These checks are only done when called from SaveStateManager (not internally via the RewindManager, etc.)
+	optional<SaveStateCompatInfo> optCompatInfo = srcConsoleType.has_value() ? _console->ValidateSaveStateCompatibility(s, srcConsoleType.value()) : std::nullopt;
+	if(optCompatInfo.has_value() && !optCompatInfo.value().IsCompatible) {
+		MessageManager::DisplayMessage("SaveStates", "SaveStateWrongSystem");
+		return DeserializeResult::SpecificError;
 	}
 
 	if(srcConsoleType.has_value() && srcConsoleType.value() != _console->GetConsoleType()) {
-		//Used to allow save states taken on GB/GBC/SGB to be loaded on any of the 3 systems
-		SaveStateCompatInfo compatInfo = _console->ValidateSaveStateCompatibility(srcConsoleType.value());
-		if(!compatInfo.IsCompatible) {
+		if(!optCompatInfo.has_value()) {
 			MessageManager::DisplayMessage("SaveStates", "SaveStateWrongSystem");
 			return DeserializeResult::SpecificError;
 		}
 
+		SaveStateCompatInfo compatInfo = optCompatInfo.value();
 		s.RemoveKeys(compatInfo.FieldsToRemove);
 
 		if(!compatInfo.PrefixToAdd.empty()) {
@@ -961,6 +968,10 @@ DeserializeResult Emulator::Deserialize(istream& in, uint32_t fileFormatVersion,
 			MessageManager::DisplayMessage("SaveStates", "SaveStateWrongSystem");
 			return DeserializeResult::SpecificError;
 		}
+	}
+
+	if(includeSettings) {
+		SV(_settings);
 	}
 
 	s.Stream(_console, "");
@@ -1063,10 +1074,12 @@ void Emulator::ResetDebugger(bool startDebugger)
 
 	if(_emulationThreadId == std::this_thread::get_id()) {
 		_debugger.reset(startDebugger ? new Debugger(this, _console.get()) : nullptr);
+		_internalDebugger = _debugger.get();
 	} else {
 		//Need to pause emulator to change _debugger (when not called from the emulation thread)
 		auto emuLock = AcquireLock();
 		_debugger.reset(startDebugger ? new Debugger(this, _console.get()) : nullptr);
+		_internalDebugger = _debugger.get();
 	}
 }
 
@@ -1125,6 +1138,9 @@ void Emulator::SetStopCode(int32_t stopCode)
 
 void Emulator::RegisterMemory(MemoryType type, void* memory, uint32_t size)
 {
+	if(_isDebuggerDisabled) {
+		return;
+	}
 	_consoleMemory[(int)type] = { memory, size };
 }
 
@@ -1159,24 +1175,30 @@ void Emulator::ProcessAudioPlayerAction(AudioPlayerActionParams p)
 
 void Emulator::ProcessEvent(EventType type, std::optional<CpuType> cpuType)
 {
-	if(_debugger) {
-		_debugger->ProcessEvent(type, cpuType);
+	if(_internalDebugger) {
+		_internalDebugger->ProcessEvent(type, cpuType);
 	}
 }
 
 template<CpuType cpuType>
 void Emulator::AddDebugEvent(DebugEventType evtType)
 {
-	if(_debugger) {
-		_debugger->GetEventManager(cpuType)->AddEvent(evtType);
+	if(_internalDebugger) {
+		_internalDebugger->GetEventManager(cpuType)->AddEvent(evtType);
 	}
 }
 
 void Emulator::BreakIfDebugging(CpuType sourceCpu, BreakSource source)
 {
-	if(_debugger) {
-		_debugger->BreakImmediately(sourceCpu, source);
+	if(_internalDebugger) {
+		_internalDebugger->BreakImmediately(sourceCpu, source);
 	}
+}
+
+void Emulator::SetDebuggerDisabled(bool disabled)
+{
+	_isDebuggerDisabled = disabled;
+	_internalDebugger = disabled ? nullptr : _debugger.get();
 }
 
 template void Emulator::AddDebugEvent<CpuType::Snes>(DebugEventType evtType);
