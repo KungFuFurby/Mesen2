@@ -651,6 +651,7 @@
 			<Control ID="grpControllers">Controllers</Control>
 			<Control ID="lblPlayer1Horizontal">Controller (Horizontal)</Control>
 			<Control ID="lblPlayer1Vertical">Controller (Vertical)</Control>
+			<Control ID="lblPlayer1Pcv2">Controller (Pocket Challenge V2)</Control>
 			<Control ID="btnSetup">Setup</Control>
 		</Form>
 		
@@ -734,7 +735,7 @@
 			<Control ID="chkGameGearRomFiles">Game Gear roms: .gg</Control>
 			<Control ID="chkSgRomFiles">SG-1000 roms: .sg</Control>
 			<Control ID="chkCvRomFiles">ColecoVision roms: .col</Control>
-			<Control ID="chkWsRomFiles">WonderSwan roms: .ws, .wsc</Control>
+			<Control ID="chkWsRomFiles">WonderSwan roms: .ws, .wsc, .pc2</Control>
 
 			<Control ID="grpDataStorageLocation">Data Storage Folder</Control>
 			<Control ID="btnChangeStorageFolder">Change folder...</Control>
@@ -2919,6 +2920,7 @@ E
 		</Enum>
 		<Enum ID="WsModel">
 			<Value ID="Auto">Auto</Value>
+			<Value ID="PocketChallenge">Pocket Challenge V2</Value>
 			<Value ID="Monochrome">WonderSwan</Value>
 			<Value ID="Color">WonderSwan Color</Value>
 			<Value ID="SwanCrystal">SwanCrystal</Value>

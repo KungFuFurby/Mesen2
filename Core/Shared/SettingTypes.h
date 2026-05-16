@@ -242,7 +242,8 @@ enum class ControllerType
 
 	//WS
 	WsController,
-	WsControllerVertical
+	WsControllerVertical,
+	Pcv2Controller
 };
 
 struct KeyMapping
@@ -762,7 +763,8 @@ enum class WsModel : uint8_t
 	Auto,
 	Monochrome,
 	Color,
-	SwanCrystal
+	SwanCrystal,
+	PocketChallenge
 };
 
 enum class WsAudioMode : uint8_t
@@ -775,6 +777,7 @@ struct WsConfig
 {
 	ControllerConfig ControllerHorizontal;
 	ControllerConfig ControllerVertical;
+	ControllerConfig ControllerPcv2;
 
 	WsModel Model = WsModel::Auto;
 	bool UseBootRom = false;

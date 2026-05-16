@@ -431,6 +431,7 @@ namespace Mesen.ViewModels
 						GetWsModelMenuItem(WsModel.Monochrome),
 						GetWsModelMenuItem(WsModel.Color),
 						GetWsModelMenuItem(WsModel.SwanCrystal),
+						GetWsModelMenuItem(WsModel.PocketChallenge),
 					}
 				},
 
