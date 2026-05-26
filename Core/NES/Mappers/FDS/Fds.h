@@ -32,6 +32,8 @@ private:
 
 	uint8_t _writeDataReg = 0;
 
+	//TODO Change $4025.D0-D1 namings/meanings so we don't have to invert the read/write logic
+	// (_resetTransfer (bit 0) -> _scanMedia, _motorOn (bit 1) -> _stopMotor)
 	bool _motorOn = false;
 	bool _resetTransfer = false;
 	bool _readMode = false;
@@ -85,7 +87,7 @@ protected:
 	uint32_t GetWorkRamPageSize() override { return 0x8000; }
 	uint32_t GetWorkRamSize() override { return 0x8000; }
 	uint16_t RegisterStartAddress() override { return 0x4020; }
-	uint16_t RegisterEndAddress() override { return 0x4092; }
+	uint16_t RegisterEndAddress() override { return 0x4097; }
 	bool AllowRegisterRead() override { return true; }
 	bool EnableCpuClockHook() override { return true; }
 
