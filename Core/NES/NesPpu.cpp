@@ -768,11 +768,12 @@ template<class T> void NesPpu<T>::LoadSprite(uint8_t spriteY, uint8_t tileIndex,
 		}
 
 		_spriteCount++;
+		_processSprites = true;
 	} else if(!extraSprite) {
 		info.LowByte = 0;
 		info.HighByte = 0;
 
-		_spriteShifterList[_spriteIndex] = SpriteShifterDone;
+		_spriteShifterList[_spriteIndex] = BaseNesPpu::SpriteShifterDone;
 	}
 
 	_spriteIndex++;
@@ -848,12 +849,13 @@ template<class T> uint8_t NesPpu<T>::GetPixelColor()
 
 	int8_t spriteIndex = -1;
 	uint8_t spriteColor = 0;
-	//If the dot is skipped, all sprite shifters are active on the first dot of the scanline.
-	if((_spriteCount | _activeSpriteShifters | _dotSkipped) && _prevRenderingEnabled) {
-		uint8_t remainingShifters = _dotSkipped ? 0xff : _activeSpriteShifters;
+	if(_processSprites && _prevRenderingEnabled) {
+		//If the dot is skipped, all sprite shifters are active on the first dot of the scanline.
+		uint8_t remainingShifters = _dotSkipped ? 0xFF : _activeSpriteShifters;
+
 		_lastSprite = &_spriteTiles[BitUtilities::GetHighestBitIndex(_activeSpriteShifters)];
 
-		//Output and shift from all active sprite shifters.
+		//Output+shift all active sprite shifters.
 		while(remainingShifters) {
 			uint8_t i = BitUtilities::GetHighestBitIndex(remainingShifters);
 			remainingShifters &= ~(1 << i);
@@ -873,6 +875,7 @@ template<class T> uint8_t NesPpu<T>::GetPixelColor()
 			//If the shifter is empty, deactivate it.
 			if(!(sprite.HighByte | sprite.LowByte)) {
 				_activeSpriteShifters &= ~(1 << i);
+				UpdateProcessSpritesFlag();
 			}
 		}
 
@@ -909,7 +912,6 @@ template<class T> uint8_t NesPpu<T>::GetPixelColor()
 			}
 		}
 	}
-
 	return ((offset + ((_cycle - 1) & 0x07) < 8) ? _previousTilePalette : _currentTilePalette) + backgroundColor;
 }
 
@@ -1019,12 +1021,19 @@ template<class T> void NesPpu<T>::ProcessScanlineImpl()
 				for(int i = 0; i < 8; i++) {
 					_spriteShifterList[i] += 1 << 4;
 				}
+				_nextSpriteShifterCycle++;
 			}
 		} else {
 			//If rendering is off, the sprites aren't put into counting mode, so make sure they're output+shift in case they got pattern data.
-			_activeSpriteShifters = 0xff;
+			_activeSpriteShifters = 0xFF;
 		}
+		UpdateProcessSpritesFlag();
 	}
+}
+
+template<class T> void NesPpu<T>::UpdateProcessSpritesFlag()
+{
+	_processSprites = _spriteCount || _activeSpriteShifters || _dotSkipped;
 }
 
 template<class T> void NesPpu<T>::ProcessSpriteEvaluationStart()
@@ -1047,10 +1056,13 @@ template<class T> void NesPpu<T>::ProcessSpriteEvaluationStart()
 template<class T> void NesPpu<T>::ProcessSpriteEvaluation()
 {
 	//Handle sprite shifter counting.
-	while(static_cast<uint32_t>(_spriteShifterList[_nextSpriteShifter] >> 4) == _cycle) {
-		_activeSpriteShifters |= (1 << (_spriteShifterList[_nextSpriteShifter] & 7));
-		_spriteShifterList[_nextSpriteShifter] = SpriteShifterDone;
-		_nextSpriteShifter++;
+	if(_nextSpriteShifterCycle == _cycle) {
+		while((uint32_t)(_spriteShifterList[_nextSpriteShifter] >> 4) == _cycle) {
+			_activeSpriteShifters |= (1 << (_spriteShifterList[_nextSpriteShifter] & 7));
+			_spriteShifterList[_nextSpriteShifter] = BaseNesPpu::SpriteShifterDone;
+			_nextSpriteShifter++;
+		}
+		_nextSpriteShifterCycle = _spriteShifterList[_nextSpriteShifter] >> 4;
 	}
 
 	if(_prevRenderingEnabled) {
@@ -1389,8 +1401,9 @@ template<class T> void NesPpu<T>::ProcessScanlineFirstCycle()
 
 	//Cycle = 0
 	if(_scanline < 240) {
-		_nextSpriteShifter = 0;
 		std::sort(_spriteShifterList, _spriteShifterList + 8);
+		_nextSpriteShifter = 0;
+		_nextSpriteShifterCycle = (_spriteShifterList[0] >> 4);
 
 		if(_scanline == -1) {
 			_statusFlags.SpriteOverflow = false;
@@ -1561,9 +1574,10 @@ template<class T> void NesPpu<T>::UpdateState()
 		_needStateUpdate = true;
 	}
 
-	if(_dotSkipped > 0) {
+	if(_dotSkipped) {
 		_dotSkipped--;
-		_needStateUpdate = true;
+		_needStateUpdate = _needStateUpdate || _dotSkipped;
+		UpdateProcessSpritesFlag();
 	}
 }
 
@@ -1638,8 +1652,10 @@ template<class T> void NesPpu<T>::Serialize(Serializer& s)
 
 		SVArray(_spriteShifterList, 8);
 		SV(_nextSpriteShifter);
+		SV(_nextSpriteShifterCycle);
 		SV(_activeSpriteShifters);
 		SV(_dotSkipped);
+		SV(_processSprites);
 
 		SV(_oamCopyDone);
 		SV(_needStateUpdate);
@@ -1674,7 +1690,7 @@ template<class T> void NesPpu<T>::Serialize(Serializer& s)
 			_oamDecayCycles[i] = _console->GetCpu()->GetCycleCount();
 		}
 
-		_spriteShifterList[8] = SpriteShifterDone;
+		_spriteShifterList[8] = BaseNesPpu::SpriteShifterDone;
 
 		_lastUpdatedPixel = -1;
 
