@@ -6,7 +6,7 @@ MesenCE is a community-managed fork based on Mesen2, created to maintain and exp
 
 ## Releases
 
-We are currently just doing development builds. When we launch stable releases, they will be available from the [releases page on GitHub](https://github.com/nesdev-org/MesenCE/releases).
+The latest stable version is available from the [releases page on GitHub](https://github.com/nesdev-org/MesenCE/releases).
 
 ## Development Builds
 
