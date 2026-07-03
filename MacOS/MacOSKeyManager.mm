@@ -1,14 +1,11 @@
 #import <Foundation/Foundation.h>
 #import <Cocoa/Cocoa.h>
-#import <GameController/GameController.h>
 
 #include <algorithm>
 #include "MacOSKeyManager.h"
-#include "MacOSGameController.h"
 //The MacOS SDK defines a global function 'Debugger', colliding with Mesen's Debugger class
 //Redefine it temporarily so the headers don't cause compilation errors due to this
 #define Debugger MesenDebugger
-#include "Shared/MessageManager.h"
 #include "Shared/Emulator.h"
 #include "Shared/EmuSettings.h"
 #include "Shared/KeyDefinitions.h"
@@ -23,40 +20,12 @@ MacOSKeyManager::MacOSKeyManager(Emulator* emu)
 
 	_keyDefinitions = KeyDefinition::GetSharedKeyDefinitions();
 
-	vector<string> buttonNames = {
-		"A", "B", "X", "Y", "L1", "R1", "Start", "Select",
-		"Up", "Down", "Left", "Right", "L2", "R2", "L3", "R3",
-		"X+", "X-", "Y+", "Y-", "X2+", "X2-", "Y2+", "Y2-",
-		"X", "Y", "X2", "Y2"
-	};
-
-	for(int i = 0; i < 20; i++) {
-		for(int j = 0; j < (int)buttonNames.size(); j++) {
-			_keyDefinitions.push_back({ "Pad" + std::to_string(i + 1) + " " + buttonNames[j], (uint32_t)(MacOSKeyManager::BaseGamepadIndex + i * 0x100 + j) });
-		}
-	}
-
 	for(KeyDefinition &keyDef : _keyDefinitions) {
 		_keyNames[keyDef.keyCode] = keyDef.name;
 		_keyCodes[keyDef.name] = keyDef.keyCode;
 	}
 
 	_disableAllKeys = false;
-
-	// On some versions of macOS, there is an assert in the GameController code that seems to verify
-	// that the GCController is getting accessed on the main thread. Users are reporting this issue
-	// only on older versions of intel MacOS, so it's hard to be 100% certain, but this reliably fixes
-	// the issue in my testing.
-	dispatch_async(dispatch_get_main_queue(), ^{
-		// On start up, load the list of existing controllers and add them.
-		// The callbacks only add controllers that are connected after launch.
-		for(GCController* controller in [GCController controllers]) {
-			AddController(controller);
-		}
-		if(@available(macOS 11.3, *)) {
-			GCController.shouldMonitorBackgroundEvents = YES;
-		}
-	});
 
 	NSEventMask eventMask = NSEventMaskKeyDown | NSEventMaskKeyUp | NSEventMaskFlagsChanged;
 
@@ -80,46 +49,11 @@ MacOSKeyManager::MacOSKeyManager(Emulator* emu)
 
 		return nil;
 	}];
-
-	_connectObserver = [[NSNotificationCenter defaultCenter] addObserverForName:GCControllerDidConnectNotification object:nil queue:nil usingBlock:^ void (NSNotification* notification) {
-		GCController* controller = (GCController*) [notification object];
-		AddController(controller);
-	}];
-
-	_disconnectObserver = [[NSNotificationCenter defaultCenter] addObserverForName:GCControllerDidDisconnectNotification object:nil queue:nil usingBlock:^ void (NSNotification* notification) {
-		GCController* controller = (GCController*) [notification object];
-
-		int indexToRemove = -1;
-		for(int i = 0; i < _controllers.size(); i++) {
-			if(_controllers[i]->IsGameController(controller)) {
-				indexToRemove = i;
-				break;
-			}
-		}
-
-		if(indexToRemove >= 0) {
-			_controllers.erase(_controllers.begin() + indexToRemove);
-			MessageManager::Log("[Input Device] Disconnected");
-		}
-	}];
 }
 
 MacOSKeyManager::~MacOSKeyManager()
 {
 	[NSEvent removeMonitor:(id) _eventMonitor];
-	[[NSNotificationCenter defaultCenter] removeObserver:(id) _connectObserver];
-	[[NSNotificationCenter defaultCenter] removeObserver:(id) _disconnectObserver];
-}
-
-void MacOSKeyManager::AddController(void* cont)
-{
-	GCController* controller = static_cast<GCController*>(cont);
-	if([controller extendedGamepad] == nil) {
-		MessageManager::Log(std::string("[Input] Device ignored (Does not support extended gamepad) - Name: ") + [[controller vendorName] UTF8String]);
-	} else {
-		_controllers.push_back(std::shared_ptr<MacOSGameController>(new MacOSGameController(_emu, controller)));
-		MessageManager::Log(std::string("[Input Connected] Name: ") + [[controller vendorName] UTF8String]);
-	}
 }
 
 void MacOSKeyManager::HandleModifiers(uint32_t flags)
@@ -146,26 +80,10 @@ bool MacOSKeyManager::IsKeyPressed(uint16_t key)
 		return false;
 	}
 
-	if(key >= MacOSKeyManager::BaseGamepadIndex) {
-		uint8_t gamepadPort = (key - MacOSKeyManager::BaseGamepadIndex) / 0x100;
-		uint8_t gamepadButton = (key - MacOSKeyManager::BaseGamepadIndex) % 0x100;
-		if(_controllers.size() > gamepadPort) {
-			return _controllers[gamepadPort]->IsButtonPressed(gamepadButton);
-		}
-	} else if(key < 0x205) {
+	if(key < 0x205) {
 		return _keyState[key] != 0;
 	}
 	return false;
-}
-
-optional<int16_t> MacOSKeyManager::GetAxisPosition(uint16_t key)
-{
-	if(key >= MacOSKeyManager::BaseGamepadIndex) {
-		uint8_t port = (key - MacOSKeyManager::BaseGamepadIndex) / 0x100;
-		uint8_t button = (key - MacOSKeyManager::BaseGamepadIndex) % 0x100;
-		return _controllers[port]->GetAxisPosition(button);
-	}
-	return std::nullopt;
 }
 
 bool MacOSKeyManager::IsMouseButtonPressed(MouseButton button)
@@ -176,13 +94,6 @@ bool MacOSKeyManager::IsMouseButtonPressed(MouseButton button)
 vector<uint16_t> MacOSKeyManager::GetPressedKeys()
 {
 	vector<uint16_t> pressedKeys;
-	for(size_t i = 0; i < _controllers.size(); i++) {
-		for(int j = 0; j < 24; j++) {
-			if(_controllers[i]->IsButtonPressed(j)) {
-				pressedKeys.push_back(MacOSKeyManager::BaseGamepadIndex + i * 0x100 + j);
-			}
-		}
-	}
 
 	for(int i = 0; i < 0x205; i++) {
 		if(_keyState[i]) {
@@ -237,7 +148,4 @@ void MacOSKeyManager::SetDisabled(bool disabled)
 
 void MacOSKeyManager::SetForceFeedback(uint16_t magnitudeRight, uint16_t magnitudeLeft)
 {
-	for(auto& controller : _controllers) {
-		controller->SetForceFeedback(magnitudeRight, magnitudeLeft);
-	}
 }
